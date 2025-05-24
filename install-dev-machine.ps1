@@ -4,7 +4,7 @@
 Set-ExecutionPolicy RemoteSigned -Scope LocalMachine -Force
 
 # Enable Developer Mode
-Enable-DeveloperMode
+Install-WindowsDeveloperMode
 
 # Install Chocolatey Packages
 choco install git vscode firefox powertoys windows-terminal `
