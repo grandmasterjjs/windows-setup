@@ -15,10 +15,12 @@ A Boxstarter-based script for provisioning Windows 11 workstations with my prefe
 Clone this repo to a fresh Windows machine and run:
 
 ```powershell
+START https://boxstarter.org/package/nr/url?https://raw.githubusercontent.com/grandmasterjjs/windows-setup/refs/heads/main/install-dev-machine.ps1
+```
+
+Or, clone this repo to a fresh Windows machine and run:
+
+```powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force
 Install-BoxstarterPackage -PackageName install-dev-machine.ps1 -Force
 ```
-
-Or, run straight from the web:
-
-```powershell
