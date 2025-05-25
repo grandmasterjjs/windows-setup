@@ -163,6 +163,27 @@ Copy-Item "$PSScriptRoot\profile\profile.ps1" $PROFILE -Force
     Write-Log "DETAILS: Failed to copy profile: $($_ | Out-String)"
 }
 
+
+# Remove "Gallery" from File Explorer Sidebar
+try {
+    $galleryCLSID = "{e88865ea-0e1c-4e20-9aa6-edcd0212c87c}"
+    $galleryRegPath = "HKCU:\Software\Classes\CLSID\$galleryCLSID"
+
+    # Create the key if it doesn't exist
+    if (-not (Test-Path $galleryRegPath)) {
+        New-Item -Path $galleryRegPath -Force | Out-Null
+    }
+
+    # Set the property to hide it from navigation pane
+    New-ItemProperty -Path $galleryRegPath -Name "System.IsPinnedToNameSpaceTree" -Value 0 -PropertyType DWORD -Force | Out-Null
+
+    Write-Log "Successfully removed 'Gallery' from File Explorer sidebar."
+} catch {
+    Write-Warning "Failed to remove 'Gallery' from File Explorer sidebar: $($_.Exception.Message)"
+    Write-Log "ERROR: Failed to remove 'Gallery' from sidebar: $($_.Exception.Message)"
+    Write-Log "DETAILS: Failed to remove 'Gallery' from sidebar: $($_ | Out-String)"
+}
+
 if (Test-PendingReboot) {
     Write-Warning "A reboot is required. Please restart manually if not running under Boxstarter."
 }
