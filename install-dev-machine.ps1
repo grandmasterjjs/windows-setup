@@ -1,5 +1,23 @@
 # install-dev-machine.ps1
 
+# This script is designed to set up a development machine with essential tools and configurations.
+# It installs Chocolatey, various applications, and configures system settings.
+# It also sets up Windows Subsystem for Linux (WSL) and Ubuntu, and customizes the appearance of Windows.
+
+# Some of the commands below only run if we're using boxstarter. If running from a normal PowerShell session,
+# we need to ensure that Boxstarter is installed and available.
+
+# Check if Boxstarter is installed
+if (-not (Get-Command "Boxstarter" -ErrorAction SilentlyContinue)) {
+    # Install Boxstarter if not installed
+    iex ((New-Object System.Net.WebClient).DownloadString('https://boxstarter.org/bootstrapper.ps1'))
+}
+# Import Boxstarter module
+Import-Module Boxstarter
+
+# Set Boxstarter to use the default Chocolatey source
+Set-BoxstarterSource -Default
+
 # Ensure Windows is fully updated before proceeding
 Update-Boxstarter -Force
 
@@ -14,9 +32,18 @@ choco install git vscode firefox powertoys windows-terminal `
     oh-my-posh adguard 1password msteams office365 `
     powershell-core -y --no-progress
 
-# Install WSL1 and Ubuntu
-Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart
-choco install wsl-ubuntu-2204 -y --no-progress
+# Install WSL2 and the latest Ubuntu only if we're not running on a VM
+if (-not (Test-Path "HKLM:\SOFTWARE\Microsoft\Virtual Machine\Guest\Parameters")) {
+    # Install WSL2
+    wsl --install --no-distribution
+
+    # Install Ubuntu
+    wsl --install -d Ubuntu
+}
+# Install Windows Subsystem for Linux (WSL) and Ubuntu
+# Install Windows Terminal and set it as default terminal
+wsl --set-default-version 2
+wsl --set-default Ubuntu
 
 # Enable .NET Framework 3.5 (some dev tools require it)
 Enable-WindowsOptionalFeature -Online -FeatureName NetFx3 -All -NoRestart

@@ -129,7 +129,7 @@ Clear-Host
 Write-Host "=========================================" -ForegroundColor Green
 Write-Host " Welcome back, $(Get-FirstName)!" -ForegroundColor Cyan
 Write-Host " System: $(Get-OSName)" -ForegroundColor Cyan
-Write-Host " $(Get-PowerShellVersion) | $(Get-LocalIP)" -ForegroundColor Cyan
+Write-Host " Shell: $($PSVersionTable.PSEdition) $($PSVersionTable.PSVersion) | $(Get-LocalIP)" -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Green
 Write-Host "Current Weather: $(Get-Weather)" -ForegroundColor Cyan
 Write-Host ""
