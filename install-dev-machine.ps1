@@ -1,8 +1,6 @@
-param(
-    [string]$GitName = "J.J. Smiley",
-    [string]$GitEmail = "jj@grandmasterj.com",
-    [string]$LogFile = "$PSScriptRoot\install-dev-machine.log"
-)
+$GitName = "J.J. Smiley"
+$GitEmail = "jj@grandmasterj.com"
+$LogFile = "$PSScriptRoot\install-dev-machine.log"
 
 # install-dev-machine.ps1
 
