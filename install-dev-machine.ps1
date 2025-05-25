@@ -26,9 +26,6 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     exit 1
 }
 
-# Enable Developer Mode
-Install-WindowsDeveloperMode
-
 # Install Chocolatey Packages
 try {
     choco upgrade git vscode firefox powertoys windows-terminal `
