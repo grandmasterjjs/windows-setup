@@ -163,7 +163,14 @@ Copy-Item "$PSScriptRoot\profile\profile.ps1" $PROFILE -Force
     Write-Log "DETAILS: Failed to copy profile: $($_ | Out-String)"
 }
 
+<#
+Please note: I hate the "Gallery" module in the Windows 11
+sidebar. When I'm running a dev/test machine, I have absolutely
+no use for it. So the block below gets rid of this crap
+for me.
 
+Your mileage may vary; use at your own risk.
+#>
 # Remove "Gallery" from File Explorer Sidebar
 try {
     $galleryCLSID = "{e88865ea-0e1c-4e20-9aa6-edcd0212c87c}"
