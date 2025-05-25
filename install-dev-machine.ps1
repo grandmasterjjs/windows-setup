@@ -27,43 +27,69 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 }
 
 # Install Chocolatey Packages
-try {
-    choco upgrade git vscode firefox powertoys windows-terminal `
-        oh-my-posh adguard 1password msteams office365 `
-        powershell-core -y --no-progress --install
-}
-catch {
-    Write-Warning "Failed to install Chocolatey packages: $($_.Exception.Message)"
-    Write-Log "ERROR: Failed to install Chocolatey packages: $($_.Exception.Message)"
-    Write-Log "DETAILS: Failed to install Chocolatey packages: $($_ | Out-String)"
+$packages = @(
+    "git", "vscode", "firefox", "powertoys", "windows-terminal",
+    "oh-my-posh", "adguard", "1password", "msteams", "office365", "powershell-core"
+)
+
+# Improved Chocolatey Package Check
+foreach ($pkg in $packages) {
+    try {
+        Write-Log "Processing package: $pkg"
+        # Use --exact for accurate matching
+        if (choco list --local-only --exact $pkg | Select-String -Pattern "^$pkg ") {
+            Write-Log "Upgrading $pkg..."
+            choco upgrade $pkg -y --no-progress
+        } else {
+            Write-Log "Installing $pkg..."
+            choco install $pkg -y --no-progress
+        }
+    } catch {
+        Write-Warning "Failed to process ${pkg}: $($_.Exception.Message)"
+        Write-Log "ERROR: Failed to process ${pkg}: $($_.Exception.Message)"
+        Write-Log "DETAILS: Failed to process ${pkg}: $($_ | Out-String)"
+    }
 }
 
 # Install WSL2 and the latest Ubuntu only if we're not running on a VM
-try {
     if (-not (Test-Path "HKLM:\SOFTWARE\Microsoft\Virtual Machine\Guest\Parameters")) {
-        # Install WSL2
-        wsl --install --no-distribution
-    
+        try {
+            Write-Log "Not running on a VM. Installing WSL2 and Ubuntu."
+            # Install WSL2
+            wsl --install --no-distribution
+            Write-Log "WSL2 installed successfully."
+        } catch {
+            Write-Warning "Failed to install WSL2: $($_.Exception.Message)"
+            Write-Log "ERROR: Failed to install WSL2: $($_.Exception.Message)"
+            Write-Log "DETAILS: Failed to install WSL2: $($_ | Out-String)"
+            exit 1
+        }
         # Install Ubuntu
-        wsl --install -d Ubuntu
-    
-        # Set WSL defaults
-        wsl --set-default-version 2
-        wsl --set-default Ubuntu
+        try {
+            wsl --install -d Canonical.Ubuntu.2404
+            # Set WSL defaults
+            wsl --set-default-version 2
+            wsl --set-default Ubuntu
+            Write-Log "WSL2 and Ubuntu installed and configured."
+        } catch {
+            Write-Warning "Failed to install Ubuntu: $($_.Exception.Message)"
+            Write-Log "ERROR: Failed to install Ubuntu: $($_.Exception.Message)"
+            Write-Log "DETAILS: Failed to install Ubuntu: $($_ | Out-String)"
+            exit 1
+        }
+    } else {
+        Write-Log "Running on a VM. Skipping WSL2 and Ubuntu installation."
     }
-}
-catch {
-    Write-Warning "Failed to install WSL/Ubuntu: $($_.Exception.Message)"
-    Write-Log "ERROR: Failed to install WSL/Ubuntu: $($_.Exception.Message)"
-    Write-Log "DETAILS: Failed to install WSL/Ubuntu: $($_ | Out-String)"
-}
 
 try {
     # Enable .NET Framework 3.5 (some dev tools require it)
     Enable-WindowsOptionalFeature -Online -FeatureName NetFx3 -All -NoRestart
+    Write-Log ".NET Framework 3.5 enabled."
 }
 catch {
     Write-Warning "Failed to enable .NET Framework 3.5: $($_.Exception.Message)"
+    Write-Log "ERROR: Failed to enable .NET Framework 3.5: $($_.Exception.Message)"
+    Write-Log "DETAILS: Failed to enable .NET Framework 3.5: $($_ | Out-String)"
 }
 
 try {
@@ -72,6 +98,7 @@ try {
         Pin-App "Windows Terminal"
         Pin-App "Microsoft Outlook"
         Pin-App "Microsoft Teams"
+        Write-Log "Pinned apps to taskbar using Boxstarter."
     }
 }
 catch {
@@ -86,6 +113,7 @@ try {
         -Name "AppsUseLightTheme" -Value 0 -Force
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
         -Name "SystemUsesLightTheme" -Value 0 -Force
+    Write-Log "Set Windows appearance to dark mode."
 }
 catch {
     Write-Warning "Failed to set Windows appearance to dark mode: $($_.Exception.Message)"
@@ -94,16 +122,31 @@ catch {
 }
 
 # Set Git Global Config (ensure git is in PATH)
-$gitPath = (Get-Command git.exe).Source
-& $gitPath config --global user.name $GitName
-& $gitPath config --global user.email $GitEmail
+try {
+    $gitPath = (Get-Command git.exe -ErrorAction Stop).Source
+    & "$gitPath" config --global user.name "$GitName"
+    & "$gitPath" config --global user.email "$GitEmail"
+    Write-Log "Configured global Git user.name and user.email."
+}
+catch {
+    Write-Warning "Failed to configure Git: $($_.Exception.Message)"
+    Write-Log "ERROR: Failed to configure Git: $($_.Exception.Message)"
+    Write-Log "DETAILS: Failed to configure Git: $($_ | Out-String)"
+}
 
 # Install profile
 try {
-if (Test-Path $PROFILE) {
-    Copy-Item $PROFILE "$PROFILE.bak" -Force
-}
-Copy-Item "$PSScriptRoot\profile\profile.ps1" $PROFILE -Force
+    $profileDir = Split-Path -Path "$PROFILE"
+    if (-not (Test-Path "$profileDir")) {
+        New-Item -Path "$profileDir" -ItemType Directory -Force | Out-Null
+        Write-Log "Created profile directory: $profileDir"
+    }
+    if (Test-Path "$PROFILE") {
+        Copy-Item -Path "$PROFILE" -Destination "$PROFILE.bak" -Force
+        Write-Log "Backed up existing profile to $PROFILE.bak"
+    }
+    Copy-Item -Path "$PSScriptRoot\profile\profile.ps1" -Destination "$PROFILE" -Force
+    Write-Log "Installed new PowerShell profile."
 } catch {
     Write-Warning "Failed to copy profile: $($_.Exception.Message)"
     Write-Log "ERROR: Failed to copy profile: $($_.Exception.Message)"
@@ -126,6 +169,7 @@ try {
     # Create the key if it doesn't exist
     if (-not (Test-Path $galleryRegPath)) {
         New-Item -Path $galleryRegPath -Force | Out-Null
+        Write-Log "Created registry key for Gallery: $galleryRegPath"
     }
 
     # Set the property to hide it from navigation pane
@@ -138,9 +182,6 @@ try {
     Write-Log "DETAILS: Failed to remove 'Gallery' from sidebar: $($_ | Out-String)"
 }
 
-if (Test-PendingReboot) {
-    Write-Warning "A reboot is required. Please restart manually if not running under Boxstarter."
-}
-
 Write-Host ""
 Write-Host "`nSetup complete. You may need to restart your computer to apply all changes." -ForegroundColor Green
+exit 0
