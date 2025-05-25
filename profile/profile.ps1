@@ -41,23 +41,46 @@ if (-not (Get-Command 'oh-my-posh' -ErrorAction SilentlyContinue)) {
 # Initialize oh-my-posh prompt
 try {
     $ompPath = (Get-Command 'oh-my-posh').Source
-    $themeDir = Join-Path (Split-Path $ompPath) 'themes'
+    $themeDir = Join-Path (Split-Path (Split-Path $ompPath)) 'themes'
     $themeFile = Join-Path $themeDir 'kali.omp.json'
     oh-my-posh init pwsh --config $themeFile | Invoke-Expression
 } catch {
     Write-Warning 'Failed to initialize oh-my-posh prompt.'
 }
 
+# Try to get the display name from AD, fallback to username
+function Get-FirstName {
+    try {
+        $user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+        $adUser = ([ADSI]"WinNT://$user").FullName
+        if ($adUser) {
+            return $adUser.Split(' ')[0]
+        }
+    } catch {}
+    # Fallback: try to split username if in firstname.lastname format
+    if ($env:USERNAME -eq "jjsmiley") {
+        return "JJ"
+    } else {
+        return ($env:USERNAME -split '[\._]')[0]
+    }
+}
+
 # Function: Get-OSName
 function Get-OSName {
-    $os = Get-CimInstance Win32_OperatingSystem
-    "$($os.Caption) [Version $($os.Version)]"
+    (Get-CimInstance Win32_OperatingSystem).Caption -replace '^Microsoft\s*', ''
+}
+
+# Function: Get PowerShell version
+# Function: Get PowerShell version
+function Get-PowerShellVersion {
+    $psVersion = $PSVersionTable.PSVersion
+    "PowerShell: $($psVersion.ToString())"
 }
 
 # Function: Get-Weather
 function Get-Weather {
     try {
-        Invoke-RestMethod -Uri 'https://wttr.in/?format=3'
+        (Invoke-RestMethod -Uri 'https://wttr.in/?format=1').Trim()
     } catch {
         'Weather: Unable to retrieve data.'
     }
@@ -84,6 +107,11 @@ Set-Alias startover Start-Over
 
 # Display greeting banner
 Clear-Host
-Write-Host "Welcome, $env:USERNAME!" -ForegroundColor Cyan
-Write-Host (Get-OSName) -ForegroundColor Cyan
-Write-Host (Get-Weather) -ForegroundColor Cyan
+Write-Host "===========================" -ForegroundColor Green
+Write-Host "Welcome back, $(Get-FirstName)!" -ForegroundColor Cyan
+Write-Host "System: $(Get-OSName)" -ForegroundColor Cyan
+Write-Host "$(Get-PowerShellVersion)" -ForegroundColor Cyan
+Write-Host "$(Get-MyIP)" -ForegroundColor Cyan
+Write-Host "Current Weather: $(Get-Weather)" -ForegroundColor Cyan
+Write-Host "===========================" -ForegroundColor Green
+Write-Host ""
