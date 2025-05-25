@@ -24,7 +24,8 @@ Enable-WindowsOptionalFeature -Online -FeatureName NetFx3 -All -NoRestart
 # Pin commonly used apps to the taskbar
 Pin-App "Visual Studio Code"
 Pin-App "Windows Terminal"
-Pin-App "Firefox"
+Pin-App "Microsoft Outlook"
+Pin-App "Microsoft Teams"
 
 # Set Windows Appearance to Dark Mode
 Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
