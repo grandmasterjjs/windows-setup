@@ -28,8 +28,8 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 
 # Install Chocolatey Packages
 $packages = @(
-    "git", "vscode", "firefox", "powertoys", "windows-terminal",
-    "oh-my-posh", "adguard", "1password", "msteams", "office365", "powershell-core"
+    "git", "vscode", "firefox", "powertoys",
+    "oh-my-posh", "1password", "powershell-core"
 )
 
 # Improved Chocolatey Package Check
@@ -135,22 +135,63 @@ catch {
 }
 
 # Install profile
+# Check network connectivity and mount drive from unas.wabash if available
+$unasShare = "\\unas.wabash\Personal-Drive"
+$unasProfile = "$unasShare\Development\GitHub\windows-setup\profile\profile.ps1"
+$driveLetter = "Z:"
+
+function Test-HostOnline {
+    param([string]$HostName)
+    try {
+        $ping = Test-Connection -ComputerName $HostName -Count 1 -Quiet -ErrorAction Stop
+        return $ping
+    } catch {
+        return $false
+    }
+}
+
 try {
-    $profileDir = Split-Path -Path "$PROFILE"
-    if (-not (Test-Path "$profileDir")) {
-        New-Item -Path "$profileDir" -ItemType Directory -Force | Out-Null
-        Write-Log "Created profile directory: $profileDir"
+    # Check if network is available
+    if (Get-NetConnectionProfile | Where-Object { $_.NetworkCategory -ne "Disconnected" }) {
+        Write-Log "Network connection detected."
+        if (Test-HostOnline -HostName "unas.wabash") {
+            Write-Log "unas.wabash is reachable on the network."
+
+            # Mount the network drive if not already mounted
+            if (-not (Get-PSDrive -Name $driveLetter.TrimEnd(':') -ErrorAction SilentlyContinue)) {
+                New-PSDrive -Name $driveLetter.TrimEnd(':') -PSProvider FileSystem -Root $unasShare -Persist -ErrorAction Stop | Out-Null
+                Write-Log "Mounted $unasShare to $driveLetter"
+            } else {
+                Write-Log "$driveLetter is already mapped."
+            }
+
+            # Copy the profile from the network share
+            $profileDir = Split-Path -Path "$PROFILE"
+            if (-not (Test-Path "$profileDir")) {
+                New-Item -Path "$profileDir" -ItemType Directory -Force | Out-Null
+                Write-Log "Created profile directory: $profileDir"
+            }
+            if (Test-Path "$PROFILE") {
+                Copy-Item -Path "$PROFILE" -Destination "$PROFILE.bak" -Force
+                Write-Log "Backed up existing profile to $PROFILE.bak"
+            }
+            if (Test-Path $unasProfile) {
+                Copy-Item -Path $unasProfile -Destination "$PROFILE" -Force
+                Write-Log "Copied profile from $unasProfile to $PROFILE"
+            } else {
+                Write-Warning "Profile file not found on network share: $unasProfile"
+                Write-Log "ERROR: Profile file not found on network share: $unasProfile"
+            }
+        } else {
+            Write-Log "unas.wabash is not reachable on the network. Skipping network profile copy."
+        }
+    } else {
+        Write-Log "No network connection detected. Skipping network profile copy."
     }
-    if (Test-Path "$PROFILE") {
-        Copy-Item -Path "$PROFILE" -Destination "$PROFILE.bak" -Force
-        Write-Log "Backed up existing profile to $PROFILE.bak"
-    }
-    Copy-Item -Path "$PSScriptRoot\profile\profile.ps1" -Destination "$PROFILE" -Force
-    Write-Log "Installed new PowerShell profile."
 } catch {
-    Write-Warning "Failed to copy profile: $($_.Exception.Message)"
-    Write-Log "ERROR: Failed to copy profile: $($_.Exception.Message)"
-    Write-Log "DETAILS: Failed to copy profile: $($_ | Out-String)"
+    Write-Warning "Failed during network profile copy: $($_.Exception.Message)"
+    Write-Log "ERROR: Failed during network profile copy: $($_.Exception.Message)"
+    Write-Log "DETAILS: Failed during network profile copy: $($_ | Out-String)"
 }
 
 <#
