@@ -28,29 +28,6 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     exit 1
 }
 
-# Check if Boxstarter is running
-if ($env:Boxstarter -ne "true") {
-    # If not running from Boxstarter, we need to install it
-    if (-not (Get-Command "Boxstarter" -ErrorAction SilentlyContinue)) {
-        # Install Boxstarter if not installed
-        iex ((New-Object System.Net.WebClient).DownloadString('https://boxstarter.org/bootstrapper.ps1'))
-    }
-}
-
-# Do we need to import the Boxstarter module? If we're running from Boxstarter, we don't need to import it.
-# Check if Boxstarter module is already loaded
-if ($env:Boxstarter -ne "true" -and (Get-Module -Name Boxstarter -ErrorAction SilentlyContinue) -eq $null) {
-    # Import the Boxstarter module
-    try {
-        Import-Module Boxstarter
-        Write-Log "Boxstarter module imported successfully."
-    }
-    catch {
-        Write-Warning "Failed to import Boxstarter module: $($_.Exception.Message)"
-        Write-Log "ERROR: Failed to import Boxstarter module: $_"
-    }
-}
-
 # Enable Developer Mode
 Install-WindowsDeveloperMode
 
