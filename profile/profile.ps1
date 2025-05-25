@@ -97,6 +97,25 @@ function Get-MyIP {
 }
 Set-Alias whatsmyip Get-MyIP
 
+# Function: Get-LocalIP
+function Get-LocalIP {
+    try {
+        $ip = Get-NetIPAddress -AddressFamily IPv4 `
+            | Where-Object { $_.IPAddress -notlike '169.254*' -and $_.IPAddress -ne '127.0.0.1' -and $_.PrefixOrigin -ne 'WellKnown' } `
+            | Where-Object { $_.InterfaceAlias -notmatch 'vEthernet|Loopback|Virtual' } `
+            | Sort-Object -Property InterfaceIndex `
+            | Select-Object -First 1 -ExpandProperty IPAddress
+        if ($ip) {
+            "IP: $ip"
+        } else {
+            "IP: Not found"
+        }
+    } catch {
+        "IP: Unable to retrieve"
+    }
+}
+Set-Alias whatsmylocalip Get-LocalIP
+
 # Function: Start-Over
 function Start-Over {
     Clear-Host
@@ -107,11 +126,10 @@ Set-Alias startover Start-Over
 
 # Display greeting banner
 Clear-Host
-Write-Host "===========================" -ForegroundColor Green
-Write-Host "Welcome back, $(Get-FirstName)!" -ForegroundColor Cyan
-Write-Host "System: $(Get-OSName)" -ForegroundColor Cyan
-Write-Host "$(Get-PowerShellVersion)" -ForegroundColor Cyan
-Write-Host "$(Get-MyIP)" -ForegroundColor Cyan
+Write-Host "=========================================" -ForegroundColor Green
+Write-Host " Welcome back, $(Get-FirstName)!" -ForegroundColor Cyan
+Write-Host " System: $(Get-OSName)" -ForegroundColor Cyan
+Write-Host " $(Get-PowerShellVersion) | $(Get-LocalIP)" -ForegroundColor Cyan
+Write-Host "=========================================" -ForegroundColor Green
 Write-Host "Current Weather: $(Get-Weather)" -ForegroundColor Cyan
-Write-Host "===========================" -ForegroundColor Green
 Write-Host ""
