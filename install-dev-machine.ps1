@@ -24,7 +24,7 @@ function Write-Log {
 
 # Check if running as Administrator
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Warning "Warning: Please run this script as Administrator."
+    Write-Warning "Please run this script as Administrator."
     exit 1
 }
 
@@ -39,42 +39,17 @@ if ($env:Boxstarter -ne "true") {
 
 # Do we need to import the Boxstarter module? If we're running from Boxstarter, we don't need to import it.
 # Check if Boxstarter module is already loaded
-try {
-    if (-not (Get-Module -Name Boxstarter)) {
+if ($env:Boxstarter -ne "true" -and (Get-Module -Name Boxstarter -ErrorAction SilentlyContinue) -eq $null) {
+    # Import the Boxstarter module
+    try {
         Import-Module Boxstarter
         Write-Log "Boxstarter module imported successfully."
     }
+    catch {
+        Write-Warning "Failed to import Boxstarter module: $($_.Exception.Message)"
+        Write-Log "ERROR: Failed to import Boxstarter module: $_"
+    }
 }
-catch {
-    Write-Warning "Failed to import Boxstarter module: $($_.Exception.Message)"
-    Write-Log "ERROR: Failed to import Boxstarter module: $_"
-}
-
-# The statements below are only for testing purposes.
-# I wanted to see what the differences were between
-# using "$_" and "$_ | Out-String" in the catch blocks.
-try {
-    # This will cause a division by zero error
-    $x = 1 / 0
-}
-catch {
-    Write-Host "Using `$_`:"
-    Write-Host $_
-    Write-Host ""
-    Write-Host "Using `$_ | Out-String`:"
-    Write-Host ($_ | Out-String)
-    Write-Warning "ERROR: Failed to perform division: $($_.Exception.Message)"
-    Write-Log "DETAILS: Failed to perform division: $($_ | Out-String)"
-}
-
-# Set Boxstarter to use the default Chocolatey source
-Set-BoxstarterSource -Default
-
-# Ensure Windows is fully updated before proceeding
-Update-Boxstarter -Force
-
-# Prevent sleep during installation
-Disable-Sleep
 
 # Enable Developer Mode
 Install-WindowsDeveloperMode
