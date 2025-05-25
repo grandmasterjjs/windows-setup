@@ -63,12 +63,8 @@ catch {
     Write-Host ""
     Write-Host "Using `$_ | Out-String`:"
     Write-Host ($_ | Out-String)
-    Write-Warning "ERROR1: Failed to perform division: $($_.Exception.Message)"
-    Write-Log "DETAILS1: Failed to perform division: $($_ | Out-String)"
-}
-catch {
-    Write-Warning "ERROR2: Failed to perform division: $($_.Exception.Message)"
-    Write-Log "DETAILS2: Failed to perform division: $($_ | Out-String)"
+    Write-Warning "ERROR: Failed to perform division: $($_.Exception.Message)"
+    Write-Log "DETAILS: Failed to perform division: $($_ | Out-String)"
 }
 
 # Set Boxstarter to use the default Chocolatey source
