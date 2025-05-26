@@ -68,7 +68,6 @@ function Get-OSName {
 }
 
 # Function: Get PowerShell version
-# Function: Get PowerShell version
 function Get-PowerShellVersion {
     $psVersion = $PSVersionTable.PSVersion
     "PowerShell: $($psVersion.ToString())"
@@ -77,7 +76,7 @@ function Get-PowerShellVersion {
 # Function: Get-Weather
 function Get-Weather {
     try {
-        (Invoke-RestMethod -Uri 'https://wttr.in/?format=1').Trim()
+        (Invoke-RestMethod -Uri 'https://wttr.in/?format=%C+%t').Trim()
     } catch {
         'Weather: Unable to retrieve data.'
     }
