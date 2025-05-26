@@ -15,7 +15,6 @@ $LogFile = "$PSScriptRoot\install-dev-machine.log"
 
 # Check for Controlled Folder Access
 
-# Function: Writes log messages to a log file.
 function Write-Log {
     param([string]$Message)
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -67,17 +66,17 @@ $packages = @(
     "oh-my-posh", "1password", "powershell-core"
 )
 
-# Improved Chocolatey Package Check
+# Improved Chocolatey Package Check (fix for --local-only deprecation)
 foreach ($pkg in $packages) {
     try {
         Write-Log "Processing package: $pkg"
-        # Use --exact for accurate matching
-        if (choco list --local-only --exact $pkg | Select-String -Pattern "^$pkg ") {
+        # Use -l for local, --exact for accurate matching
+        if (choco list -l --exact $pkg | Select-String -Pattern "^$pkg ") {
             Write-Log "Upgrading $pkg..."
-            choco upgrade $pkg -y --no-progress
+            choco upgrade $pkg -y --no-progress -r *> $null
         } else {
             Write-Log "Installing $pkg..."
-            choco install $pkg -y --no-progress
+            choco install $pkg -y --no-progress -r *> $null
         }
     } catch {
         Write-Warning "Failed to process ${pkg}: $($_.Exception.Message)"
@@ -109,12 +108,12 @@ if (-not (Test-IsVM)) {
     try {
         Write-Log "Not running on a VM. Installing WSL2 and Ubuntu."
         # Install WSL2
-        wsl --install --no-distribution
+        wsl --install --no-distribution *> $null
         Write-Log "WSL2 installed successfully."
-        # Install Ubuntu
-        wsl --install -d Canonical.Ubuntu.2404
-        wsl --set-default-version 2
-        wsl --set-default Ubuntu
+        # Install Ubuntu (use correct distro name)
+        wsl --install -d Ubuntu-24.04 *> $null
+        wsl --set-default-version 2 *> $null
+        wsl --set-default Ubuntu *> $null
         Write-Log "WSL2 and Ubuntu installed and configured."
     } catch {
         Write-Warning "Failed to install WSL2/Ubuntu: $($_.Exception.Message)"
@@ -128,7 +127,7 @@ if (-not (Test-IsVM)) {
 
 try {
     # Enable .NET Framework 3.5 (some dev tools require it)
-    Enable-WindowsOptionalFeature -Online -FeatureName NetFx3 -All -NoRestart
+    Enable-WindowsOptionalFeature -Online -FeatureName NetFx3 -All -NoRestart -ErrorAction Stop | Out-Null
     Write-Log ".NET Framework 3.5 enabled."
 }
 catch {
@@ -137,13 +136,13 @@ catch {
     Write-Log "DETAILS: Failed to enable .NET Framework 3.5: $($_ | Out-String)"
 }
 
-# Pin Applications to Taskbar if Boxstarter is available.
+# Pin Applications to Taskbar if Boxstarter is available (silent except on error)
 try {
     if ($env:Boxstarter -eq "true") {
-        Pin-App "Visual Studio Code"
-        Pin-App "Windows Terminal"
-        Pin-App "Microsoft Outlook"
-        Pin-App "Microsoft Teams"
+        Pin-App "Visual Studio Code" *> $null
+        Pin-App "Windows Terminal" *> $null
+        Pin-App "Microsoft Outlook" *> $null
+        Pin-App "Microsoft Teams" *> $null
         Write-Log "Pinned apps to taskbar using Boxstarter."
     }
 }
@@ -153,12 +152,12 @@ catch {
     Write-Log "DETAILS: Failed to pin applications: $($_ | Out-String)"
 }
 
-# Set Windows Appearance to Dark Mode
+# Set Windows Appearance to Dark Mode (silent except on error)
 try {
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
-        -Name "AppsUseLightTheme" -Value 0 -Force
+        -Name "AppsUseLightTheme" -Value 0 -Force | Out-Null
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
-        -Name "SystemUsesLightTheme" -Value 0 -Force
+        -Name "SystemUsesLightTheme" -Value 0 -Force | Out-Null
     Write-Log "Set Windows appearance to dark mode."
 }
 catch {
@@ -167,11 +166,11 @@ catch {
     Write-Log "DETAILS: Failed to set Windows appearance to dark mode: $($_ | Out-String)"
 }
 
-# Set Git Global Config (ensure git is in PATH)
+# Set Git Global Config (ensure git is in PATH, silent except on error)
 try {
     $gitPath = (Get-Command git.exe -ErrorAction Stop).Source
-    & "$gitPath" config --global user.name "$GitName"
-    & "$gitPath" config --global user.email "$GitEmail"
+    & "$gitPath" config --global user.name "$GitName" *> $null
+    & "$gitPath" config --global user.email "$GitEmail" *> $null
     Write-Log "Configured global Git user.name and user.email."
 }
 catch {
@@ -183,7 +182,6 @@ catch {
 # Install custom PowerShell profile from network share if available
 $unasShare = "\\unas.wabash\Personal-Drive"
 $unasProfile = "$unasShare\Development\GitHub\windows-setup\profile\profile.ps1"
-# $driveLetter = "Z:"   # Currently, this variable is not used.
 
 function Test-HostOnline {
     param([string]$HostName)
@@ -195,71 +193,50 @@ function Test-HostOnline {
     }
 }
 
-try {
-    $profilePath = $PROFILE.CurrentUserCurrentHost
-    $profileDir = Split-Path -Path $profilePath
-    # Ensure the profile directory exists
-    if (-not (Test-Path $profileDir)) {
-        New-Item -Path $profileDir -ItemType Directory -Force | Out-Null
-        Write-Log "Created profile directory: $profileDir"
-    }
-    # Back up existing profile if it exists
-    if (Test-Path $profilePath) {
-        Copy-Item -Path $profilePath -Destination "$profilePath.bak" -Force
-        Write-Log "Backed up existing profile to $profilePath.bak"
-    }
-    # Copy the profile from the network share
-    if (Test-Path $unasProfile) {
-        Copy-Item -Path $unasProfile -Destination $profilePath -Force
-        Write-Log "Copied profile from $unasProfile to $profilePath"
-        Write-Host "Custom profile installed to $profilePath"
-        Write-Host "`n--- Profile Content ---"
-        Get-Content $profilePath | Write-Host
-        Write-Host "`n--- End Profile Content ---"
-    } else {
-        Write-Warning "Profile file not found on network share: $unasProfile"
-        Write-Log "ERROR: Profile file not found on network share: $unasProfile"
-    }
-} catch {
-    Write-Warning "Failed during profile copy: $($_.Exception.Message)"
-    Write-Log "ERROR: Failed during profile copy: $($_.Exception.Message)"
-    Write-Log "DETAILS: Failed during profile copy: $($_ | Out-String)"
-}
-
-# Determine the real user's profile directory (not the admin's)
+# Robust Documents path detection (handles OneDrive redirection)
 $realUser = $env:SUDO_USER
 if (-not $realUser) { $realUser = $env:USERNAME }
 $realUserProfile = (Get-CimInstance Win32_UserProfile | Where-Object { $_.LocalPath -like "*\$realUser" -and $_.Loaded }).LocalPath
 
+# Try to get Documents path from registry (handles OneDrive)
+$docsPath = (Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" -Name "Personal" -ErrorAction SilentlyContinue)."Personal"
+if ($docsPath -and $docsPath -notmatch "^%") {
+    $docsPath = [Environment]::ExpandEnvironmentVariables($docsPath)
+} else {
+    $docsPath = Join-Path $realUserProfile "Documents"
+}
+
 # Profile paths for both Windows PowerShell and PowerShell Core
 $pwshDirs = @(
-    @{ Dir = Join-Path $realUserProfile "Documents\PowerShell";      Name = "PowerShell Core" },
-    @{ Dir = Join-Path $realUserProfile "Documents\WindowsPowerShell"; Name = "Windows PowerShell" }
+    @{ Dir = Join-Path $docsPath "PowerShell";      Name = "PowerShell Core" },
+    @{ Dir = Join-Path $docsPath "WindowsPowerShell"; Name = "Windows PowerShell" }
 )
 foreach ($pwsh in $pwshDirs) {
     $profileDir = $pwsh.Dir
     $profilePath = Join-Path $profileDir "Microsoft.PowerShell_profile.ps1"
-    # Ensure the profile directory exists
-    if (-not (Test-Path $profileDir)) {
-        New-Item -Path $profileDir -ItemType Directory -Force | Out-Null
-        Write-Log "Created profile directory: $profileDir"
-    }
-    # Back up existing profile if it exists
-    if (Test-Path $profilePath) {
-        Copy-Item -Path $profilePath -Destination "$profilePath.bak" -Force
-        Write-Log "Backed up existing profile to $profilePath.bak"
-    }
-    # Copy the profile from the network share
-    if (Test-Path $unasProfile) {
-        Copy-Item -Path $unasProfile -Destination $profilePath -Force
-        Write-Log "Copied profile from $unasProfile to $profilePath ($($pwsh.Name))"
-        Write-Host "Custom profile installed to $profilePath ($($pwsh.Name))"
-        Write-Host "`n--- Profile Content ($($pwsh.Name)) ---"
-        Get-Content $profilePath | Write-Host
-        Write-Host "`n--- End Profile Content ($($pwsh.Name)) ---"
+    if ($profileDir -and $profilePath) {
+        if (-not (Test-Path $profileDir)) {
+            New-Item -Path $profileDir -ItemType Directory -Force | Out-Null
+            Write-Log "Created profile directory: $profileDir"
+        }
+        if (Test-Path $profilePath) {
+            Copy-Item -Path $profilePath -Destination "$profilePath.bak" -Force | Out-Null
+            Write-Log "Backed up existing profile to $profilePath.bak"
+        }
+        if (Test-Path $unasProfile) {
+            Copy-Item -Path $unasProfile -Destination $profilePath -Force | Out-Null
+            Write-Log "Copied profile from $unasProfile to $profilePath ($($pwsh.Name))"
+            Write-Host "Custom profile installed to $profilePath ($($pwsh.Name))"
+            Write-Host "`n--- Profile Content ($($pwsh.Name)) ---"
+            Get-Content $profilePath | Write-Host
+            Write-Host "`n--- End Profile Content ($($pwsh.Name)) ---"
+        } else {
+            Write-Warning "Profile file not found on network share: $unasProfile"
+            Write-Log "ERROR: Profile file not found on network share: $unasProfile"
+        }
     } else {
-        Write-Warning "Profile file not found on network share: $unasProfile"
-        Write-Log "ERROR: Profile file not found on network share: $unasProfile"
+        Write-Warning "Profile directory or path is null for $($pwsh.Name)"
+        Write-Log "ERROR: Profile directory or path is null for $($pwsh.Name)"
     }
 }
 
@@ -272,7 +249,7 @@ for me.
 Your mileage may vary; use at your own risk.
 #>
 
-# Remove "Gallery" from File Explorer Sidebar
+# Remove "Gallery" from File Explorer Sidebar (silent except on error)
 try {
     $galleryCLSID = "{e88865ea-0e1c-4e20-9aa6-edcd0212c87c}"
     $galleryRegPath = "HKCU:\Software\Classes\CLSID\$galleryCLSID"
