@@ -58,7 +58,7 @@ function Get-FirstName {
         }
     } catch {}
     # Fallback: try to split username if in firstname.lastname format
-    if ($env:USERNAME -eq "jjsmiley") {
+    if ($env:USERNAME -eq "jjsmiley" || $env:USERNAME -eq "jsmiley" || $env:USERNAME -eq "jsmil") {
         return "JJ"
     } else {
         return ($env:USERNAME -split '[\._]')[0]
