@@ -13,6 +13,39 @@ $LogFile = "$PSScriptRoot\install-dev-machine.log"
 
 # If we're running from the Boxstarter "install direct from the web" we do not need to install Boxstarter.
 
+# Check for Controlled Folder Access
+try {
+    $cfaStatus = Get-MpPreference | Select-Object -ExpandProperty EnableControlledFolderAccess
+    if ($cfaStatus -eq 1) {
+        Write-Warning "Controlled Folder Access is ENABLED. This may prevent the script from modifying your profile and other folders."
+        Write-Host "To avoid errors, you can:"
+        Write-Host "  1. Temporarily disable Controlled Folder Access during setup."
+        Write-Host "  2. Or, add PowerShell to the list of allowed apps for Controlled Folder Access."
+        Write-Host "     Example (run as admin):"
+        Write-Host "     Add-MpPreference -ControlledFolderAccessAllowedApplications 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'"
+        Write-Host "     Add-MpPreference -ControlledFolderAccessAllowedApplications 'C:\Program Files\PowerShell\7\pwsh.exe'"
+        Write-Log "Controlled Folder Access is enabled. User warned."
+
+        Write-Host ""
+        Write-Host "Press any key to exit, or wait 10 seconds to continue..." -NoNewline
+        $timeout = 10
+        for ($i = 0; $i -lt $timeout; $i++) {
+            Start-Sleep -Seconds 1
+            Write-Host "." -NoNewline
+            if ($Host.UI.RawUI.KeyAvailable) {
+                $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+                Write-Host ""
+                Write-Host "Exiting script due to Controlled Folder Access."
+                exit 1
+            }
+        }
+        Write-Host ""
+        Write-Host "Continuing with script execution..."
+    }
+} catch {
+    Write-Log "Could not check Controlled Folder Access status: $($_.Exception.Message)"
+}
+
 function Write-Log {
     param([string]$Message)
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
