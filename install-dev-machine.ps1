@@ -1,19 +1,12 @@
 $GitName = "J.J. Smiley"
 $GitEmail = "jj@grandmasterj.com"
-$LogFile = "$PSScriptRoot\install-dev-machine.log"
+$LogFile = "C:\install-dev-machine.log"
 
 # install-dev-machine.ps1
 
 # This script is designed to set up a development machine with essential tools and configurations.
 # It installs Chocolatey, various applications, and configures system settings.
 # It also sets up Windows Subsystem for Linux (WSL) and Ubuntu, and customizes the appearance of Windows.
-
-# Some of the commands below only run if we're using boxstarter. If running from a normal PowerShell session,
-# we need to ensure that Boxstarter is installed and available.
-
-# If we're running from the Boxstarter "install direct from the web" we do not need to install Boxstarter.
-
-# Check for Controlled Folder Access
 
 function Write-Log {
     param([string]$Message)
@@ -66,12 +59,12 @@ $packages = @(
     "oh-my-posh", "1password", "powershell-core"
 )
 
-# Improved Chocolatey Package Check (fix for --local-only deprecation)
+# Chocolatey v2.x: Use --exact only, do not use -l or --local-only
 foreach ($pkg in $packages) {
     try {
         Write-Log "Processing package: $pkg"
-        # Use -l for local, --exact for accurate matching
-        if (choco list -l --exact $pkg | Select-String -Pattern "^$pkg ") {
+        $isInstalled = choco list --exact $pkg | Select-String -Pattern "^$pkg " -Quiet
+        if ($isInstalled) {
             Write-Log "Upgrading $pkg..."
             choco upgrade $pkg -y --no-progress -r *> $null
         } else {
@@ -180,9 +173,17 @@ catch {
 }
 
 # Install custom PowerShell profile from network share if available
-$unasShare = "\\unas.wabash\Personal-Drive"
-$unasProfile = "$unasShare\Development\GitHub\windows-setup\profile\profile.ps1"
 
+# Prefer Z: if mapped, fallback to UNC
+if (Test-Path "Z:\Development\GitHub\windows-setup\profile\profile.ps1") {
+    $unasShare = "Z:"
+} else {
+    $unasShare = "\\unas.wabash\Personal-Drive"
+}
+$unasProfile = "$unasShare\Development\GitHub\windows-setup\profile\profile.ps1"
+Write-Log "Using profile path: $unasProfile"
+
+# Function: Test if the host is online
 function Test-HostOnline {
     param([string]$HostName)
     try {
