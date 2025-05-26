@@ -14,6 +14,15 @@ $LogFile = "$PSScriptRoot\install-dev-machine.log"
 # If we're running from the Boxstarter "install direct from the web" we do not need to install Boxstarter.
 
 # Check for Controlled Folder Access
+
+# Function: Writes log messages to a log file.
+function Write-Log {
+    param([string]$Message)
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $entry = "$timestamp $Message"
+    Add-Content -Path $LogFile -Value $entry
+}
+
 try {
     $cfaStatus = Get-MpPreference | Select-Object -ExpandProperty EnableControlledFolderAccess
     if ($cfaStatus -eq 1) {
@@ -44,13 +53,6 @@ try {
     }
 } catch {
     Write-Log "Could not check Controlled Folder Access status: $($_.Exception.Message)"
-}
-
-function Write-Log {
-    param([string]$Message)
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $entry = "$timestamp $Message"
-    Add-Content -Path $LogFile -Value $entry
 }
 
 # Check if running as Administrator
