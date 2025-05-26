@@ -191,6 +191,43 @@ try {
     Write-Log "DETAILS: Failed during profile copy: $($_ | Out-String)"
 }
 
+# Determine the real user's profile directory (not the admin's)
+$realUser = $env:SUDO_USER
+if (-not $realUser) { $realUser = $env:USERNAME }
+$realUserProfile = (Get-CimInstance Win32_UserProfile | Where-Object { $_.LocalPath -like "*\$realUser" -and $_.Loaded }).LocalPath
+
+# Profile paths for both Windows PowerShell and PowerShell Core
+$pwshDirs = @(
+    @{ Dir = Join-Path $realUserProfile "Documents\PowerShell";      Name = "PowerShell Core" },
+    @{ Dir = Join-Path $realUserProfile "Documents\WindowsPowerShell"; Name = "Windows PowerShell" }
+)
+foreach ($pwsh in $pwshDirs) {
+    $profileDir = $pwsh.Dir
+    $profilePath = Join-Path $profileDir "Microsoft.PowerShell_profile.ps1"
+    # Ensure the profile directory exists
+    if (-not (Test-Path $profileDir)) {
+        New-Item -Path $profileDir -ItemType Directory -Force | Out-Null
+        Write-Log "Created profile directory: $profileDir"
+    }
+    # Back up existing profile if it exists
+    if (Test-Path $profilePath) {
+        Copy-Item -Path $profilePath -Destination "$profilePath.bak" -Force
+        Write-Log "Backed up existing profile to $profilePath.bak"
+    }
+    # Copy the profile from the network share
+    if (Test-Path $unasProfile) {
+        Copy-Item -Path $unasProfile -Destination $profilePath -Force
+        Write-Log "Copied profile from $unasProfile to $profilePath ($($pwsh.Name))"
+        Write-Host "Custom profile installed to $profilePath ($($pwsh.Name))"
+        Write-Host "`n--- Profile Content ($($pwsh.Name)) ---"
+        Get-Content $profilePath | Write-Host
+        Write-Host "`n--- End Profile Content ($($pwsh.Name)) ---"
+    } else {
+        Write-Warning "Profile file not found on network share: $unasProfile"
+        Write-Log "ERROR: Profile file not found on network share: $unasProfile"
+    }
+}
+
 <#
 Please note: I hate the "Gallery" module in the Windows 11
 sidebar. When I'm running a dev/test machine, I have absolutely
