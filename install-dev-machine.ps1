@@ -148,7 +148,7 @@ catch {
 # Install custom PowerShell profile from network share if available
 $unasShare = "\\unas.wabash\Personal-Drive"
 $unasProfile = "$unasShare\Development\GitHub\windows-setup\profile\profile.ps1"
-$driveLetter = "Z:"
+# $driveLetter = "Z:"   # Currently, this variable is not used.
 
 function Test-HostOnline {
     param([string]$HostName)
