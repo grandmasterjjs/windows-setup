@@ -163,48 +163,32 @@ function Test-HostOnline {
 try {
     $profilePath = $PROFILE.CurrentUserCurrentHost
     $profileDir = Split-Path -Path $profilePath
-    # Check if network is available
-    if (Get-NetConnectionProfile | Where-Object { $_.NetworkCategory -ne "Disconnected" }) {
-        Write-Log "Network connection detected."
-        if (Test-HostOnline -HostName "unas.wabash") {
-            Write-Log "unas.wabash is reachable on the network."
-            # Mount the network drive if not already mounted
-            if (-not (Get-PSDrive -Name $driveLetter.TrimEnd(':') -ErrorAction SilentlyContinue)) {
-                New-PSDrive -Name $driveLetter.TrimEnd(':') -PSProvider FileSystem -Root $unasShare -Persist -ErrorAction Stop | Out-Null
-                Write-Log "Mounted $unasShare to $driveLetter"
-            } else {
-                Write-Log "$driveLetter is already mapped."
-            }
-            # Copy the profile from the network share
-            if (-not (Test-Path "$profileDir")) {
-                New-Item -Path "$profileDir" -ItemType Directory -Force | Out-Null
-                Write-Log "Created profile directory: $profileDir"
-            }
-            if (Test-Path $profilePath) {
-                Copy-Item -Path $profilePath -Destination "$profilePath.bak" -Force
-                Write-Log "Backed up existing profile to $profilePath.bak"
-            }
-            if (Test-Path $unasProfile) {
-                Copy-Item -Path $unasProfile -Destination $profilePath -Force
-                Write-Log "Copied profile from $unasProfile to $profilePath"
-                Write-Host "Custom profile installed to $profilePath"
-                Write-Host "`n--- Profile Content ---"
-                Get-Content $profilePath | Write-Host
-                Write-Host "`n--- End Profile Content ---"
-            } else {
-                Write-Warning "Profile file not found on network share: $unasProfile"
-                Write-Log "ERROR: Profile file not found on network share: $unasProfile"
-            }
-        } else {
-            Write-Log "unas.wabash is not reachable on the network. Skipping network profile copy."
-        }
+    # Ensure the profile directory exists
+    if (-not (Test-Path $profileDir)) {
+        New-Item -Path $profileDir -ItemType Directory -Force | Out-Null
+        Write-Log "Created profile directory: $profileDir"
+    }
+    # Back up existing profile if it exists
+    if (Test-Path $profilePath) {
+        Copy-Item -Path $profilePath -Destination "$profilePath.bak" -Force
+        Write-Log "Backed up existing profile to $profilePath.bak"
+    }
+    # Copy the profile from the network share
+    if (Test-Path $unasProfile) {
+        Copy-Item -Path $unasProfile -Destination $profilePath -Force
+        Write-Log "Copied profile from $unasProfile to $profilePath"
+        Write-Host "Custom profile installed to $profilePath"
+        Write-Host "`n--- Profile Content ---"
+        Get-Content $profilePath | Write-Host
+        Write-Host "`n--- End Profile Content ---"
     } else {
-        Write-Log "No network connection detected. Skipping network profile copy."
+        Write-Warning "Profile file not found on network share: $unasProfile"
+        Write-Log "ERROR: Profile file not found on network share: $unasProfile"
     }
 } catch {
-    Write-Warning "Failed during network profile copy: $($_.Exception.Message)"
-    Write-Log "ERROR: Failed during network profile copy: $($_.Exception.Message)"
-    Write-Log "DETAILS: Failed during network profile copy: $($_ | Out-String)"
+    Write-Warning "Failed during profile copy: $($_.Exception.Message)"
+    Write-Log "ERROR: Failed during profile copy: $($_.Exception.Message)"
+    Write-Log "DETAILS: Failed during profile copy: $($_ | Out-String)"
 }
 
 <#
