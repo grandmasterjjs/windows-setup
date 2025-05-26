@@ -51,17 +51,14 @@ try {
 # Try to get the display name from AD, fallback to username
 function Get-FirstName {
     try {
-        $user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-        $adUser = ([ADSI]"WinNT://$user").FullName
-        if ($adUser) {
-            return $adUser.Split(' ')[0]
-        }
-    } catch {}
-    # Fallback: try to split username if in firstname.lastname format
-    if ($env:USERNAME -eq "jjsmiley" || $env:USERNAME -eq "jsmiley" || $env:USERNAME -eq "jsmil") {
-        return "JJ"
+        if ($env:USERNAME.ToLower() -in @("jjsmiley", "jsmiley", "jsmil")) {
+    return "JJ"
     } else {
         return ($env:USERNAME -split '[\._]')[0]
+    }
+} catch {
+        Write-Warning 'Failed to retrieve first name.'
+        return 'Kiddo'
     }
 }
 
