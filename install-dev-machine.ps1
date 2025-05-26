@@ -51,35 +51,45 @@ foreach ($pkg in $packages) {
     }
 }
 
-# Install WSL2 and the latest Ubuntu only if we're not running on a VM
-    if (-not (Test-Path "HKLM:\SOFTWARE\Microsoft\Virtual Machine\Guest\Parameters")) {
-        try {
-            Write-Log "Not running on a VM. Installing WSL2 and Ubuntu."
-            # Install WSL2
-            wsl --install --no-distribution
-            Write-Log "WSL2 installed successfully."
-        } catch {
-            Write-Warning "Failed to install WSL2: $($_.Exception.Message)"
-            Write-Log "ERROR: Failed to install WSL2: $($_.Exception.Message)"
-            Write-Log "DETAILS: Failed to install WSL2: $($_ | Out-String)"
-            exit 1
+# Function: Tests to see if we're running in a VM.
+function Test-IsVM {
+    try {
+        $manufacturer = (Get-WmiObject Win32_ComputerSystem).Manufacturer
+        $model = (Get-WmiObject Win32_ComputerSystem).Model
+        if ($manufacturer -match "VMware|Microsoft|Xen|VirtualBox|Parallels" -or $model -match "Virtual|VMware|VirtualBox|Parallels") {
+            return $true
         }
-        # Install Ubuntu
-        try {
-            wsl --install -d Canonical.Ubuntu.2404
-            # Set WSL defaults
-            wsl --set-default-version 2
-            wsl --set-default Ubuntu
-            Write-Log "WSL2 and Ubuntu installed and configured."
-        } catch {
-            Write-Warning "Failed to install Ubuntu: $($_.Exception.Message)"
-            Write-Log "ERROR: Failed to install Ubuntu: $($_.Exception.Message)"
-            Write-Log "DETAILS: Failed to install Ubuntu: $($_ | Out-String)"
-            exit 1
+        # Boxstarter sets this variable if running in a VM
+        if ($env:BOXSTARTER_VM -eq "true") {
+            return $true
         }
-    } else {
-        Write-Log "Running on a VM. Skipping WSL2 and Ubuntu installation."
+        return $false
+    } catch {
+        return $false
     }
+}
+
+# Here we check if we're running in a VM. If we are, we skip the WSL2 and Ubuntu installation.
+if (-not (Test-IsVM)) {
+    try {
+        Write-Log "Not running on a VM. Installing WSL2 and Ubuntu."
+        # Install WSL2
+        wsl --install --no-distribution
+        Write-Log "WSL2 installed successfully."
+        # Install Ubuntu
+        wsl --install -d Canonical.Ubuntu.2404
+        wsl --set-default-version 2
+        wsl --set-default Ubuntu
+        Write-Log "WSL2 and Ubuntu installed and configured."
+    } catch {
+        Write-Warning "Failed to install WSL2/Ubuntu: $($_.Exception.Message)"
+        Write-Log "ERROR: Failed to install WSL2/Ubuntu: $($_.Exception.Message)"
+        Write-Log "DETAILS: Failed to install WSL2/Ubuntu: $($_ | Out-String)"
+        exit 1
+    }
+} else {
+    Write-Log "Running on a VM. Skipping WSL2 and Ubuntu installation."
+}
 
 try {
     # Enable .NET Framework 3.5 (some dev tools require it)
@@ -92,6 +102,7 @@ catch {
     Write-Log "DETAILS: Failed to enable .NET Framework 3.5: $($_ | Out-String)"
 }
 
+# Pin Applications to Taskbar if Boxstarter is available.
 try {
     if ($env:Boxstarter -eq "true") {
         Pin-App "Visual Studio Code"
@@ -134,8 +145,7 @@ catch {
     Write-Log "DETAILS: Failed to configure Git: $($_ | Out-String)"
 }
 
-# Install profile
-# Check network connectivity and mount drive from unas.wabash if available
+# Install custom PowerShell profile from network share if available
 $unasShare = "\\unas.wabash\Personal-Drive"
 $unasProfile = "$unasShare\Development\GitHub\windows-setup\profile\profile.ps1"
 $driveLetter = "Z:"
@@ -151,12 +161,13 @@ function Test-HostOnline {
 }
 
 try {
+    $profilePath = $PROFILE.CurrentUserCurrentHost
+    $profileDir = Split-Path -Path $profilePath
     # Check if network is available
     if (Get-NetConnectionProfile | Where-Object { $_.NetworkCategory -ne "Disconnected" }) {
         Write-Log "Network connection detected."
         if (Test-HostOnline -HostName "unas.wabash") {
             Write-Log "unas.wabash is reachable on the network."
-
             # Mount the network drive if not already mounted
             if (-not (Get-PSDrive -Name $driveLetter.TrimEnd(':') -ErrorAction SilentlyContinue)) {
                 New-PSDrive -Name $driveLetter.TrimEnd(':') -PSProvider FileSystem -Root $unasShare -Persist -ErrorAction Stop | Out-Null
@@ -164,20 +175,22 @@ try {
             } else {
                 Write-Log "$driveLetter is already mapped."
             }
-
             # Copy the profile from the network share
-            $profileDir = Split-Path -Path "$PROFILE"
             if (-not (Test-Path "$profileDir")) {
                 New-Item -Path "$profileDir" -ItemType Directory -Force | Out-Null
                 Write-Log "Created profile directory: $profileDir"
             }
-            if (Test-Path "$PROFILE") {
-                Copy-Item -Path "$PROFILE" -Destination "$PROFILE.bak" -Force
-                Write-Log "Backed up existing profile to $PROFILE.bak"
+            if (Test-Path $profilePath) {
+                Copy-Item -Path $profilePath -Destination "$profilePath.bak" -Force
+                Write-Log "Backed up existing profile to $profilePath.bak"
             }
             if (Test-Path $unasProfile) {
-                Copy-Item -Path $unasProfile -Destination "$PROFILE" -Force
-                Write-Log "Copied profile from $unasProfile to $PROFILE"
+                Copy-Item -Path $unasProfile -Destination $profilePath -Force
+                Write-Log "Copied profile from $unasProfile to $profilePath"
+                Write-Host "Custom profile installed to $profilePath"
+                Write-Host "`n--- Profile Content ---"
+                Get-Content $profilePath | Write-Host
+                Write-Host "`n--- End Profile Content ---"
             } else {
                 Write-Warning "Profile file not found on network share: $unasProfile"
                 Write-Log "ERROR: Profile file not found on network share: $unasProfile"
@@ -202,6 +215,7 @@ for me.
 
 Your mileage may vary; use at your own risk.
 #>
+
 # Remove "Gallery" from File Explorer Sidebar
 try {
     $galleryCLSID = "{e88865ea-0e1c-4e20-9aa6-edcd0212c87c}"
